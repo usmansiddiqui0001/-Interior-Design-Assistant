@@ -169,125 +169,71 @@ const generateDesignIdeas = async (base64Image: string, style: string, dimension
 
 
 const generateRedesignedImage = async (designPlan: DesignPlan, style: string, roomType: string, base64Image: string, newColors?: ColorPalette): Promise<string> => {
-  const furnitureList = designPlan.furnitureSuggestions.map(f => `- ${f.name}: ${f.placement}`).join('\n');
-  const primaryColor = newColors?.color || designPlan.wallColor.color;
-  const accentColor = newColors?.accent || designPlan.wallColor.accent;
+    const furnitureList = designPlan.furnitureSuggestions.map(f => `- ${f.name}: ${f.placement}`).join('\n');
+    const primaryColor = newColors?.color || designPlan.wallColor.color;
+    const accentColor = newColors?.accent || designPlan.wallColor.accent;
 
-  const isExterior = roomType.toLowerCase() === 'exterior';
+    const imagePart = {
+        inlineData: {
+            mimeType: 'image/jpeg',
+            data: base64Image,
+        },
+    };
 
-  const coreTask = isExterior 
-    ? `Your task is to generate a single, professional, magazine-quality photograph of the provided building exterior, completely transformed according to the new design plan. The final image must be indistinguishable from a real architectural photograph taken on a clear, sunny day.`
-    : `Your task is to generate a single, professional, magazine-quality photograph of the provided room, completely transformed according to the new design plan. The final image must be indistinguishable from a real photograph.`;
-
-  const designElements = isExterior
-    ? `
-- **Style:** ${style}
-- **Primary Color:** Apply "${primaryColor}" to the main exterior walls.
-- **Accent Color:** Use "${accentColor}" for trim, doors, or other architectural features as a tasteful accent.
-- **Lighting:** Implement a lighting scheme appropriate for the exterior: "${designPlan.lighting}". The scene should be rendered in bright, natural daylight to create crisp shadows and highlights.
-- **Landscaping/Decor:** Remove all existing moveable items. Introduce and expertly arrange the following new pieces:
+    const textPrompt = `Redesign this ${roomType} in a photorealistic ${style} style.
+Incorporate these elements:
+- Walls: ${primaryColor} with ${accentColor} accents.
+- Flooring: ${designPlan.flooring}.
+- Lighting: ${designPlan.lighting}.
+- Furniture:
 ${furnitureList}
-`
-    : `
-- **Style:** ${style}
-- **Wall Color:** Apply "${primaryColor}" to the main walls and "${accentColor}" as a tasteful accent.
-- **Flooring:** Completely replace the floor with: "${designPlan.flooring}".
-- **Lighting:** Implement a sophisticated lighting scheme: "${designPlan.lighting}". The lighting should be natural and create a welcoming ambiance.
-- **Furniture:** Remove all existing furniture. Introduce and expertly arrange the following new pieces:
-${furnitureList}
-`;
-
-  const architecturalConstraint = isExterior
-    ? `It is absolutely forbidden to alter the original building's core architecture. The size, shape, and placement of windows, doors, roofline, structural supports, or any fixed element must remain identical to the original image. The new design must fit perfectly within the existing structure.`
-    : `It is absolutely forbidden to alter the original room's architecture. The size, shape, and placement of windows, doors, structural beams, closets, or any fixed element must remain identical to the original image. The new design must fit perfectly within the existing space.`;
-    
-  const transformationScope = isExterior
-    ? `All visible exterior surfaces must be rendered with the new design. The walls, trim, and ground surfaces (if applicable) must be fully replaced. No part of the original exterior should be visible.`
-    : `All visible surfaces must be rendered with the new design. The walls, ceiling, and floor must be fully replaced. No part of the original room should be visible.`;
+Crucially, preserve the original room's structure, like walls, windows, and doors. Replace only the furnishings and decor.
+The final output must be only the redesigned image, with no text.`;
 
 
-  const imagePart = {
-    inlineData: {
-      mimeType: 'image/jpeg',
-      data: base64Image,
-    },
-  };
+    const textPart = { text: textPrompt };
 
-  const textPrompt = `You are an elite AI visualization engine, a master of photorealistic architectural rendering. Your sole purpose is to create a single, flawless, high-resolution photograph based on the user's image and a new design plan. The final image MUST be indistinguishable from a professional photograph shot on a high-end DSLR camera.
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image-preview',
+        contents: { parts: [imagePart, textPart] },
+        config: {
+            responseModalities: [Modality.IMAGE, Modality.TEXT],
+        },
+    });
 
-**Core Task:**
-${coreTask}
+    const candidate = response.candidates?.[0];
 
-**Design Plan to Implement:**
-${designElements}
-
-**CRITICAL QUALITY & EXECUTION DIRECTIVES (NON-COMPLIANCE WILL LEAD TO REJECTION):**
-
-1.  **HYPER-REALISM & PHOTOGRAPHIC QUALITY:**
-    -   **Benchmark:** The output must look like a real photo from a premier architectural magazine (e.g., Architectural Digest, Dezeen). It should not look like a 3D render or a digital painting.
-    -   **Lighting:** The lighting must be sophisticated and natural. Create realistic soft shadows, subtle highlights, and accurate light bounce. For interiors, light should appear to come from natural sources like windows. For exteriors, emulate a bright, slightly overcast day for soft, diffused light and crisp details. Avoid flat, artificial, or inconsistent lighting.
-    -   **Detail & Sharpness:** The image must be sharp and full of fine details. Every texture, edge, and object should be clearly defined.
-
-2.  **MATERIALITY & TEXTURES:**
-    -   Render all materials with extreme fidelity. Textures must be deeply convincing and tactile. Show the subtle grain in wood, the weave of fabrics, the cool reflections on metal, the slight imperfections in a plaster wall.
-    -   Surfaces must have physically accurate properties, including reflections, glossiness, and how they react to light.
-
-3.  **COMPLETE & TOTAL TRANSFORMATION:**
-    -   This is a complete replacement, not an overlay. **Absolutely no trace of the original image's textures, colors, furniture, or decor should remain.**
-    -   ${transformationScope} The new design must be implemented completely, covering every visible surface as if the space was physically renovated.
-
-4.  **ARCHITECTURAL SANCTITY:**
-    -   ${architecturalConstraint} This is the most critical rule. The core structure (walls, windows, doors, ceiling height, support columns, etc.) MUST NOT be altered in any way.
-
-5.  **ZERO AI ARTIFACTS:**
-    -   The output must be free of any common AI image generation flaws: no blurry or smeared textures, no warped perspectives, no illogical object fusions, no distorted lines, no unnatural lighting. The image must be coherent and physically plausible.
-
-6.  **OUTPUT FORMAT:**
-    -   Your final output must be ONLY the generated image. Do not include any text, descriptions, titles, or any other commentary.`;
-
-  const textPart = { text: textPrompt };
-
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-image-preview',
-    contents: { parts: [imagePart, textPart] },
-    config: {
-        responseModalities: [Modality.IMAGE, Modality.TEXT],
-    },
-  });
-
-  const candidate = response.candidates?.[0];
-
-  if (!candidate) {
-      const blockReason = response.promptFeedback?.blockReason;
-      const safetyRatings = response.promptFeedback?.safetyRatings?.map(r => `${r.category}: ${r.probability}`).join(', ');
-      let reason = "The AI returned an empty response, which could be due to a safety filter or a temporary issue.";
-      if (blockReason) {
-          reason = `Request was blocked due to: ${blockReason}.`;
-      } else if (safetyRatings) {
-          reason = `Request may have been blocked by safety filters. Ratings: ${safetyRatings}`;
-      }
-      throw new Error(reason);
-  }
+    if (!candidate) {
+        const blockReason = response.promptFeedback?.blockReason;
+        const safetyRatings = response.promptFeedback?.safetyRatings?.map(r => `${r.category}: ${r.probability}`).join(', ');
+        let reason = "The AI returned an empty response, which could be due to a safety filter or a temporary issue.";
+        if (blockReason) {
+            reason = `Request was blocked due to: ${blockReason}.`;
+        } else if (safetyRatings) {
+            reason = `Request may have been blocked by safety filters. Ratings: ${safetyRatings}`;
+        }
+        throw new Error(reason);
+    }
   
-  if (candidate.finishReason && candidate.finishReason !== 'STOP') {
-      throw new Error(`Image generation stopped unexpectedly. Reason: ${candidate.finishReason}`);
-  }
+    if (candidate.finishReason && candidate.finishReason !== 'STOP') {
+        throw new Error(`Image generation stopped unexpectedly. Reason: ${candidate.finishReason}`);
+    }
 
-  if (candidate.content && candidate.content.parts) {
-      for (const part of candidate.content.parts) {
-          if (part.inlineData && part.inlineData.data) {
-              return part.inlineData.data;
-          }
-      }
-  }
+    if (candidate.content && candidate.content.parts) {
+        for (const part of candidate.content.parts) {
+            if (part.inlineData && part.inlineData.data) {
+                return part.inlineData.data;
+            }
+        }
+    }
   
-  const textResponse = response.text;
-  if (textResponse) {
-      console.warn("AI responded with text instead of an image:", textResponse);
-      throw new Error(`The AI provided a text response instead of an image. This can happen if the request is not possible to fulfill. AI response: "${textResponse.substring(0, 100)}..."`);
-  }
+    const textResponse = response.text;
+    if (textResponse) {
+        console.warn("AI responded with text instead of an image:", textResponse);
+        throw new Error(`The AI provided a text response instead of an image. This can happen if the request is not possible to fulfill. AI response: "${textResponse.substring(0, 100)}..."`);
+    }
   
-  throw new Error("The AI did not return a redesigned image. The response was valid but contained no image data.");
+    throw new Error("The AI did not return a redesigned image. The response was valid but contained no image data.");
 };
 
 const morePalettesSchema = {
