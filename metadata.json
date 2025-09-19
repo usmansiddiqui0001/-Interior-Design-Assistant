@@ -1,0 +1,7 @@
+{
+  "name": "AI Interior Design Assistant",
+  "description": "An AI-powered assistant that suggests a complete room makeover based on an uploaded photo and a selected design style. It provides decor ideas and furniture recommendations.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
