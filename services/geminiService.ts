@@ -1,39 +1,37 @@
-
 import type { DesignPlan, RoomDimensions, ColorPalette } from '../types';
 
-// This is a helper function to call our new secure API backend
-async function callApi(action: string, payload: object) {
-  try {
-    const response = await fetch('/api/generate', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ action, payload }),
-    });
+// A helper function to call our serverless API endpoint
+async function callApi<T>(action: string, payload: object): Promise<T> {
+  const response = await fetch('/api/generate', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ action, payload }),
+  });
 
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to parse error response from server.' }));
-        throw new Error(errorData.error || `Server responded with status: ${response.status}`);
-    }
-    
-    return await response.json();
+  const result = await response.json();
 
-  } catch (error) {
-    console.error(`Client-side error calling API for action "${action}":`, error);
-    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
-    throw new Error(`Failed to communicate with the server. ${errorMessage}`);
+  if (!response.ok) {
+    console.error('API Error:', result.error);
+    // Try to provide a more user-friendly error message
+    const userFriendlyError = result.error && result.error.includes("safety")
+      ? "The request was blocked by a safety filter. Please modify your prompt or image."
+      : `An error occurred: ${result.error || 'Unknown server error'}`;
+    throw new Error(userFriendlyError);
   }
+
+  return result as T;
 }
 
 export const generateDesignIdeas = async (base64Image: string, style: string, dimensions: RoomDimensions, roomType: string): Promise<DesignPlan> => {
-  return callApi('generateDesignIdeas', { base64Image, style, dimensions, roomType });
+  return callApi<DesignPlan>('generateDesignIdeas', { base64Image, style, dimensions, roomType });
 };
 
 export const generateRedesignedImage = async (designPlan: DesignPlan, style: string, roomType: string, base64Image: string, newColors?: ColorPalette): Promise<string> => {
-  return callApi('generateRedesignedImage', { designPlan, style, roomType, base64Image, newColors });
+  return callApi<string>('generateRedesignedImage', { designPlan, style, roomType, base64Image, newColors });
 };
 
 export const generateMorePalettes = async (designPlan: DesignPlan, style: string): Promise<ColorPalette[]> => {
-  return callApi('generateMorePalettes', { designPlan, style });
+  return callApi<ColorPalette[]>('generateMorePalettes', { designPlan, style });
 };
